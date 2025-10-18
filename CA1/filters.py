@@ -31,16 +31,17 @@ def apply_filter(image, filter_type, **kwargs):
 
     def convolve2d(image, kernel):
         """Perform 2D convolution operation"""
-        # Pad the image to handle borders
-        pad_size = kernel.shape[0] // 2
-        padded_image = np.pad(image, pad_size, mode='edge')
+        # Convert to float for precision
+        image_float = image.astype(np.float64)
 
-        output = np.zeros_like(image, dtype=np.float64)
+        pad_size = kernel.shape[0] // 2
+        padded_image = np.pad(image_float, pad_size, mode='edge')
+
+        output = np.zeros_like(image_float)
 
         for i in range(image.shape[0]):
             for j in range(image.shape[1]):
                 roi = padded_image[i:i+kernel.shape[0], j:j+kernel.shape[1]]
-                # Perform convolution
                 output[i, j] = np.sum(roi * kernel)
         return output
 
@@ -57,23 +58,28 @@ def apply_filter(image, filter_type, **kwargs):
             return np.clip(filtered_image, 0, 255).astype(np.uint8)
 
     def median_filter(image, size=3):
-        """Apply median filter"""
-        pad_size = size // 2
-        padded_image = np.pad(image, pad_size, mode='edge')
+        """Apply median filter (fixes wrong padding across channels)."""
+        # If grayscale, convert once before calling this function (or handle here consistently)
+        if image.ndim == 2:
+            image = np.stack([image, image, image], axis=2)
 
-        output = np.zeros_like(image)
+        padSize = size // 2
+        # Pad only spatial dimensions, don't pad channels (last tuple (0,0))
+        padded = np.pad(image, ((padSize, padSize), (padSize, padSize), (0, 0)), mode='edge')
 
-        for i in range(image.shape[0]):
-            for j in range(image.shape[1]):
-                if len(image.shape) == 3:  # Color image
-                    for c in range(image.shape[2]):
-                        roi = padded_image[i:i+size, j:j+size, c]
-                        output[i, j, c] = np.median(roi)
-                else:  # Grayscale
-                    roi = padded_image[i:i+size, j:j+size]
-                    output[i, j] = np.median(roi)
+        # Prepare output as float for precision, same shape as input
+        output = np.zeros_like(image, dtype=np.float64)
 
+        h, w, channels = image.shape
+        for i in range(h):
+            for j in range(w):
+                for c in range(channels):
+                    roi = padded[i:i+size, j:j+size, c]  # now this samples correct channel
+                    output[i, j, c] = np.median(roi)
+
+        output = np.clip(output, 0, 255).astype(np.uint8)
         return output
+
 
     def sobel_filter(image):
         """Apply Sobel edge detection filter"""
@@ -202,10 +208,41 @@ def apply_filter(image, filter_type, **kwargs):
             filtered_image = np.zeros_like(image, dtype=np.float64)
             for c in range(image.shape[2]):
                 filtered_image[:, :, c] = convolve2d(image[:, :, c], kernel)
-            return np.clip(filtered_image, 0, 255).astype(np.uint8)
+            # Normalize and clip
+            filtered_image = np.clip(filtered_image, 0, 255).astype(np.uint8)
+            return filtered_image
         else:  # Grayscale image
             filtered_image = convolve2d(image, kernel)
-            return np.clip(filtered_image, 0, 255).astype(np.uint8)
+            filtered_image = np.clip(filtered_image, 0, 255).astype(np.uint8)
+            return filtered_image
+
+    def salt_pepper_noise(image, salt_vs_pepper=0.5, amount=0.05):
+        output = np.copy(image)
+
+        # Determine total number of pixels to be corrupted
+        total_pixels = image.shape[0] * image.shape[1]
+        num_salt = int(np.ceil(amount * total_pixels * salt_vs_pepper))
+        num_pepper = int(np.ceil(amount * total_pixels * (1.0 - salt_vs_pepper)))
+
+        if len(image.shape) == 2:  # Grayscale image
+            # Add salt noise (white pixels)
+            coords = [np.random.randint(0, i - 1, num_salt) for i in image.shape]
+            output[coords[0], coords[1]] = 255
+
+            # Add pepper noise (black pixels)
+            coords = [np.random.randint(0, i - 1, num_pepper) for i in image.shape]
+            output[coords[0], coords[1]] = 0
+
+        else:  # Color image
+            # Add salt noise (white pixels)
+            coords = [np.random.randint(0, i - 1, num_salt) for i in image.shape[:2]]
+            output[coords[0], coords[1], :] = [255, 255, 255]
+            
+            # Add pepper noise (black pixels)
+            coords = [np.random.randint(0, i - 1, num_pepper) for i in image.shape[:2]]
+            output[coords[0], coords[1], :] = [0, 0, 0]
+
+        return output
 
     # Apply the appropriate filter
     if filter_type.lower() == 'gaussian':
@@ -219,6 +256,9 @@ def apply_filter(image, filter_type, **kwargs):
 
     elif filter_type.lower() == 'median':
         size = kwargs.get('size', 3)
+        # convert grayscale to RGB once (if needed)
+        if len(image.shape) == 2:
+            image = np.stack([image, image, image], axis=2)
         return median_filter(image, size)
 
     elif filter_type.lower() == 'sobel':
@@ -231,5 +271,11 @@ def apply_filter(image, filter_type, **kwargs):
         low_threshold = kwargs.get('low_threshold', 50)
         high_threshold = kwargs.get('high_threshold', 150)
         return canny_filter(image, low_threshold, high_threshold)
+
+    elif filter_type.lower() == 'salt_pepper':
+        salt_vs_pepper = kwargs.get('salt_vs_pepper', 0.5)
+        amount = kwargs.get('amount', 0.05)
+        return salt_pepper_noise(image, salt_vs_pepper, amount)
+
     else:
-        raise ValueError(f"Unknown filter type: {filter_type}. Supported types: 'gaussian', 'mean', 'median', 'canny', 'sobel', 'laplacian'")
+        raise ValueError(f"Unknown filter type: {filter_type}. Supported types: 'gaussian', 'mean', 'median', 'canny', 'sobel', 'laplacian', 'salt_pepper'")

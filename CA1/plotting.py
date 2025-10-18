@@ -3,17 +3,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 def plotImageComparisons(images, titles, cols=3, figsize=(15, 5)):
-
     """
     Plot multiple images in a grid for comparison.
-    
-    Args:
-        images: List of images to display
-        titles: List of titles for each image
-        cols: Number of columns in the subplot grid
-        figsize: Figure size as (width, height)
     """
-
     rows = int(np.ceil(len(images) / cols))
     _, axes = plt.subplots(rows, cols, figsize=figsize)
 
@@ -27,7 +19,17 @@ def plotImageComparisons(images, titles, cols=3, figsize=(15, 5)):
 
     for i, (img, title) in enumerate(zip(images, titles)):
         if i < len(axes):
-            axes[i].imshow(img, cmap='gray' if len(img.shape) == 2 else None)
+            # Ensure img is in correct format for imshow
+            if img.dtype != np.uint8:
+                img = np.clip(img, 0, 255).astype(np.uint8)
+            
+            # For RGB images, convert to float [0.0, 1.0] for safe rendering GRAY SCALE BUG
+            if len(img.shape) == 3 and img.shape[2] == 3:
+                img_float = img.astype(np.float32) / 255.0
+                axes[i].imshow(img_float, cmap=None)  # Explicit RGB
+            else:
+                axes[i].imshow(img, cmap='gray')
+
             axes[i].axis('off')
             axes[i].set_title(title)
 

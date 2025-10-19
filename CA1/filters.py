@@ -59,7 +59,7 @@ def apply_filter(image, filter_type, **kwargs):
 
     def median_filter(image, size=3):
         """Apply median filter (fixes wrong padding across channels)."""
-        # If grayscale, convert once before calling this function (or handle here consistently)
+        # If grayscale, convert once before calling this function
         if image.ndim == 2:
             image = np.stack([image, image, image], axis=2)
 
@@ -74,7 +74,7 @@ def apply_filter(image, filter_type, **kwargs):
         for i in range(h):
             for j in range(w):
                 for c in range(channels):
-                    roi = padded[i:i+size, j:j+size, c]  # now this samples correct channel
+                    roi = padded[i:i+size, j:j+size, c]
                     output[i, j, c] = np.median(roi)
 
         output = np.clip(output, 0, 255).astype(np.uint8)
@@ -83,7 +83,6 @@ def apply_filter(image, filter_type, **kwargs):
 
     def sobel_filter(image):
         """Apply Sobel edge detection filter"""
-        # Define Sobel kernels
         sobel_x = np.array([[-1, 0, 1],
                             [-2, 0, 2],
                             [-1, 0, 1]], dtype=np.float64)
@@ -98,21 +97,18 @@ def apply_filter(image, filter_type, **kwargs):
         else:  # Grayscale image
             gray = image.astype(np.float64)
 
-        # Apply the Sobel kernels
         grad_x = convolve2d(gray, sobel_x)
         grad_y = convolve2d(gray, sobel_y)
 
         # Calculate the gradient magnitude
         magnitude = np.sqrt(grad_x**2 + grad_y**2)
 
-        # Normalize to 0-255 range
         magnitude = np.clip(magnitude / np.max(magnitude) * 255, 0, 255)
 
         return magnitude.astype(np.uint8)
 
     def laplacian_filter(image):
         """Apply Laplacian edge detection filter"""
-        # Define Laplacian kernel
         laplacian_kernel = np.array([[0, 1, 0],
                                      [1, -4, 1],
                                      [0, 1, 0]], dtype=np.float64)
@@ -123,7 +119,6 @@ def apply_filter(image, filter_type, **kwargs):
         else:  # Grayscale image
             gray = image.astype(np.float64)
 
-        # Apply the Laplacian kernel
         result = convolve2d(gray, laplacian_kernel)
 
         # Take absolute value and normalize
@@ -140,12 +135,10 @@ def apply_filter(image, filter_type, **kwargs):
         else:  # Grayscale image
             gray = image.astype(np.float64)
 
-        # Apply Gaussian blur (approximate)
         # Using a 5x5 Gaussian kernel with sigma=1
         gaussian_kernel_5x5 = gaussian_kernel(5, 1)
         blurred = convolve2d(gray, gaussian_kernel_5x5)
 
-        # Compute gradients using Sobel
         sobel_x = np.array([[-1, 0, 1],
                             [-2, 0, 2],
                             [-1, 0, 1]], dtype=np.float64)
@@ -244,7 +237,6 @@ def apply_filter(image, filter_type, **kwargs):
 
         return output
 
-    # Apply the appropriate filter
     if filter_type.lower() == 'gaussian':
         size = kwargs.get('size', 5)
         sigma = kwargs.get('sigma', 1)
@@ -256,7 +248,7 @@ def apply_filter(image, filter_type, **kwargs):
 
     elif filter_type.lower() == 'median':
         size = kwargs.get('size', 3)
-        # convert grayscale to RGB once (if needed)
+        # convert grayscale to RGB once
         if len(image.shape) == 2:
             image = np.stack([image, image, image], axis=2)
         return median_filter(image, size)

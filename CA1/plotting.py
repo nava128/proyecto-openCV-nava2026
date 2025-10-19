@@ -277,10 +277,8 @@ def adjustContrast(image, factor):
 
     # Convert to float to avoid overflow
     imgFloat = image.astype(np.float64)
-    # Calculate mean intensity
     mean = np.mean(imgFloat)
     # Apply contrast adjustment
     adjusted = mean + factor * (imgFloat - mean)
-    # Clip values to valid range [0, 255]
     adjusted = np.clip(adjusted, 0, 255)
     return adjusted.astype(np.uint8)

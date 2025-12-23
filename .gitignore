@@ -127,6 +127,8 @@ marimo/_lsp/
 __marimo__/
 
 */Docs/*
+FinalProject/results/samples
+FinalProject/results/pix2pix_checkpoint.pt
 
 .matplotlib
 
